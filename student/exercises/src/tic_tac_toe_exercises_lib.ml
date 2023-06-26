@@ -66,9 +66,13 @@ let available_moves
   ~(pieces : Piece.t Position.Map.t)
   : Position.t list
   =
-  ignore game_kind;
-  ignore pieces;
-  failwith "Implement me!"
+  let board_length = Game_kind.board_length game_kind in
+  let twod_move_list =
+    List.init board_length ~f:(fun row ->
+      List.init board_length ~f:(fun col -> { Position.row; column = col }))
+  in
+  let move_list = List.concat twod_move_list in
+  List.filter move_list ~f:(fun pos -> not (Map.mem pieces pos))
 ;;
 
 (* Exercise 2.
