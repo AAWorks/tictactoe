@@ -81,12 +81,13 @@ let available_moves
 
    After you are done with this implementation, you can uncomment out
    "evaluate" test cases found below in this file. *)
+
+let check_horizontal ~length ~pieces ~twodlength : bool = false
+
 let evaluate ~(game_kind : Game_kind.t) ~(pieces : Piece.t Position.Map.t)
   : Evaluation.t
   =
-  ignore pieces;
-  ignore game_kind;
-  failwith "Implement me!"
+  List.iter
 ;;
 
 (* Exercise 3. *)
@@ -212,16 +213,26 @@ let%expect_test "print_non_win" =
 ;;
 
 (* After you've implemented [available_moves], uncomment these tests! *)
-(* let%expect_test "yes available_moves" = let (moves : Position.t list) =
-   available_moves ~game_kind:non_win.game_kind ~pieces:non_win.pieces |>
-   List.sort ~compare:Position.compare in print_s [%sexp (moves : Position.t
-   list)]; [%expect {| (((row 0) (column 1)) ((row 0) (column 2)) ((row 1)
-   (column 1)) ((row 1) (column 2)) ((row 2) (column 1))) |}] ;;
+let%expect_test "yes available_moves" =
+  let (moves : Position.t list) =
+    available_moves ~game_kind:non_win.game_kind ~pieces:non_win.pieces
+    |> List.sort ~compare:Position.compare
+  in
+  print_s [%sexp (moves : Position.t list)];
+  [%expect
+    {| 
+   (((row 0) (column 1)) ((row 0) (column 2)) ((row 1) (column 1))
+    ((row 1) (column 2)) ((row 2) (column 1))) |}]
+;;
 
-   let%expect_test "no available_moves" = let (moves : Position.t list) =
-   available_moves ~game_kind:win_for_x.game_kind ~pieces:win_for_x.pieces |>
-   List.sort ~compare:Position.compare in print_s [%sexp (moves : Position.t
-   list)]; [%expect {| () |}] ;; *)
+let%expect_test "no available_moves" =
+  let (moves : Position.t list) =
+    available_moves ~game_kind:win_for_x.game_kind ~pieces:win_for_x.pieces
+    |> List.sort ~compare:Position.compare
+  in
+  print_s [%sexp (moves : Position.t list)];
+  [%expect {| () |}]
+;;
 
 (* When you've implemented the [evaluate] function, uncomment the next two
    tests! *)
