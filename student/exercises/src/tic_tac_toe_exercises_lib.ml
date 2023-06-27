@@ -101,7 +101,7 @@ let rec check_line
     match Map.find pieces pos with
     | Some new_piece ->
       if Piece.equal new_piece piece
-      then check_line to_win dir (dir pos) piece pieces game_kind
+      then check_line (to_win - 1) dir pos piece pieces game_kind
       else false
     | None -> false)
 ;;
@@ -280,13 +280,19 @@ let%expect_test "no available_moves" =
 
 (* When you've implemented the [evaluate] function, uncomment the next two
    tests! *)
-(* let%expect_test "evalulate_win_for_x" = print_endline (evaluate
-   ~game_kind:win_for_x.game_kind ~pieces:win_for_x.pieces |>
-   Evaluation.to_string); [%expect {| (Win (X)) |}] ;;
+let%expect_test "evalulate_win_for_x" =
+  print_endline
+    (evaluate ~game_kind:win_for_x.game_kind ~pieces:win_for_x.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Game_over(winner(X))) |}]
+;;
 
-   let%expect_test "evalulate_non_win" = print_endline (evaluate
-   ~game_kind:non_win.game_kind ~pieces:non_win.pieces |>
-   Evaluation.to_string); [%expect {| Game_continues |}] ;; *)
+let%expect_test "evalulate_non_win" =
+  print_endline
+    (evaluate ~game_kind:non_win.game_kind ~pieces:non_win.pieces
+     |> Evaluation.to_string);
+  [%expect {| Game_continues |}]
+;;
 
 (* When you've implemented the [winning_moves] function, uncomment this
    test! *)
