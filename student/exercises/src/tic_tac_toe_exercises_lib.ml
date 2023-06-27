@@ -12,6 +12,15 @@ module Evaluation = struct
   let to_string (t : t) = t |> sexp_of_t |> Sexp.to_string
 end
 
+let boardlist game_kind =
+  let board_length = Game_kind.board_length game_kind in
+  let twod_move_list =
+    List.init board_length ~f:(fun row ->
+      List.init board_length ~f:(fun col -> { Position.row; column = col }))
+  in
+  List.concat twod_move_list
+;;
+
 (* Here are some functions which know how to create a couple different kinds
    of games *)
 let empty_game =
@@ -66,13 +75,7 @@ let available_moves
   ~(pieces : Piece.t Position.Map.t)
   : Position.t list
   =
-  let board_length = Game_kind.board_length game_kind in
-  let twod_move_list =
-    List.init board_length ~f:(fun row ->
-      List.init board_length ~f:(fun col -> { Position.row; column = col }))
-  in
-  let move_list = List.concat twod_move_list in
-  List.filter move_list ~f:(fun pos -> not (Map.mem pieces pos))
+  List.filter (boardlist game_kind) ~f:(fun pos -> not (Map.mem pieces pos))
 ;;
 
 (* Exercise 2.
@@ -82,12 +85,53 @@ let available_moves
    After you are done with this implementation, you can uncomment out
    "evaluate" test cases found below in this file. *)
 
-let check_horizontal ~length ~pieces ~twodlength : bool = false
+let rec check_line
+  (to_win : int)
+  (dir : Position.t -> Position.t)
+  (old_pos : Position.t)
+  (piece : Piece.t)
+  (pieces : Piece.t Position.Map.t)
+  (game_kind : Game_kind.t)
+  : bool
+  =
+  let pos = dir old_pos in
+  if to_win = 0
+  then true
+  else (
+    match Map.find pieces pos with
+    | Some new_piece ->
+      if Piece.equal new_piece piece
+      then check_line to_win dir (dir pos) piece pieces game_kind
+      else false
+    | None -> false)
+;;
+
+let check_cell
+  (position : Position.t)
+  (piece : Piece.t)
+  (pieces : Piece.t Position.Map.t)
+  (game_kind : Game_kind.t)
+  : bool
+  =
+  let to_win = Game_kind.win_length game_kind - 1 in
+  let check_line_wrapper dir : bool =
+    check_line to_win dir position piece pieces game_kind
+  in
+  let checks = Position.[ right; down; down_right; up_right ] in
+  List.exists checks ~f:check_line_wrapper
+;;
 
 let evaluate ~(game_kind : Game_kind.t) ~(pieces : Piece.t Position.Map.t)
   : Evaluation.t
   =
-  List.iter
+  let check_cell_wrapper pos : bool =
+    match Map.find pieces pos with
+    | Some piece -> check_cell pos piece pieces game_kind
+    | None -> false
+  in
+  match List.find (boardlist game_kind) ~f:check_cell_wrapper with
+  | Some pos -> Game_over { winner = Some (Map.find_exn pieces pos) }
+  | None -> Game_continues
 ;;
 
 (* Exercise 3. *)
