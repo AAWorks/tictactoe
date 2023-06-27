@@ -135,16 +135,50 @@ let evaluate ~(game_kind : Game_kind.t) ~(pieces : Piece.t Position.Map.t)
 ;;
 
 (* Exercise 3. *)
+let rec w_check_line
+  (to_win : int)
+  (dir : Position.t -> Position.t)
+  (old_pos : Position.t)
+  (piece : Piece.t)
+  (pieces : Piece.t Position.Map.t)
+  (game_kind : Game_kind.t)
+  : bool
+  =
+  let pos = dir old_pos in
+  if to_win = 0
+  then true
+  else (
+    match Map.find pieces pos with
+    | Some new_piece ->
+      if Piece.equal new_piece piece
+      then w_check_line (to_win - 1) dir pos piece pieces game_kind
+      else false
+    | None -> false)
+;;
+
+let w_check_cell
+  (position : Position.t)
+  (piece : Piece.t)
+  (pieces : Piece.t Position.Map.t)
+  (game_kind : Game_kind.t)
+  : bool
+  =
+  let to_win = Game_kind.win_length game_kind - 1 in
+  let w_check_line_wrapper dir : bool =
+    w_check_line to_win dir position piece pieces game_kind
+  in
+  let checks = Position.all_offsets in
+  List.exists checks ~f:w_check_line_wrapper
+;;
+
 let winning_moves
   ~(me : Piece.t)
   ~(game_kind : Game_kind.t)
   ~(pieces : Piece.t Position.Map.t)
   : Position.t list
   =
-  ignore me;
-  ignore game_kind;
-  ignore pieces;
-  failwith "Implement me!"
+  let moves = available_moves ~game_kind ~pieces in
+  List.filter moves ~f:(fun pos -> w_check_cell pos me pieces game_kind)
 ;;
 
 (* Exercise 4. *)
@@ -296,12 +330,25 @@ let%expect_test "evalulate_non_win" =
 
 (* When you've implemented the [winning_moves] function, uncomment this
    test! *)
-(*let%expect_test "winning_move" = let positions = winning_moves
-  ~game_kind:non_win.game_kind ~pieces:non_win.pieces ~me:Piece.X in print_s
-  [%sexp (positions : Position.t list)]; [%expect {| ((((row 1) (column 1))))
-  |}]; let positions = winning_moves ~game_kind:non_win.game_kind
-  ~pieces:non_win.pieces ~me:Piece.O in print_s [%sexp (positions :
-  Position.t list)]; [%expect {| () |}] ;;*)
+let%expect_test "winning_move" =
+  let positions =
+    winning_moves
+      ~game_kind:non_win.game_kind
+      ~pieces:non_win.pieces
+      ~me:Piece.X
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect {| ((((row 1) (column 1))))
+  |}];
+  let positions =
+    winning_moves
+      ~game_kind:non_win.game_kind
+      ~pieces:non_win.pieces
+      ~me:Piece.O
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect {| () |}]
+;;
 
 (* When you've implemented the [losing_moves] function, uncomment this
    test! *)
