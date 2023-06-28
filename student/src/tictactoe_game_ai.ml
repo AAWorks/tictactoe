@@ -10,7 +10,7 @@ open Protocol
 
    After you are done, update [compute_next_move] to use your
    [random_move_strategy]. *)
-let _random_move_strategy
+let random_move_strategy
   ~(game_kind : Game_kind.t)
   ~(pieces : Piece.t Position.Map.t)
   : Position.t
@@ -52,10 +52,14 @@ let pick_winning_move_or_block_if_possible_strategy
   ~(pieces : Piece.t Position.Map.t)
   : Position.t
   =
-  ignore me;
-  ignore game_kind;
-  ignore pieces;
-  failwith "Implement me!"
+  let win_moves = winning_moves ~me ~game_kind ~pieces in
+  if List.is_empty win_moves
+  then (
+    let lose_moves = losing_moves ~me ~game_kind ~pieces in
+    if List.is_empty lose_moves
+    then random_move_strategy ~game_kind ~pieces
+    else List.random_element_exn lose_moves)
+  else List.random_element_exn win_moves
 ;;
 
 (* disables unused warning. Feel free to delete once it's used. *)
@@ -89,5 +93,5 @@ let compute_next_move ~(me : Piece.t) ~(game_state : Game_state.t)
   =
   let pieces = game_state.pieces in
   let game_kind = game_state.game_kind in
-  pick_winning_move_if_possible_strategy ~me ~game_kind ~pieces
+  pick_winning_move_or_block_if_possible_strategy ~me ~game_kind ~pieces
 ;;
