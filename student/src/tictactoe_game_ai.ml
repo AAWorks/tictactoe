@@ -62,6 +62,8 @@ let pick_winning_move_or_block_if_possible_strategy
   else List.random_element_exn win_moves
 ;;
 
+let _ = pick_winning_move_or_block_if_possible_strategy
+
 let score
   ~(me : Piece.t)
   ~(game_kind : Game_kind.t)
@@ -83,36 +85,76 @@ let score
 
 let _ = score
 
-let rec minimax pos depth maximizingPlayer me pieces game_kind : float =
+let rec minimax
+  pos
+  depth
+  maximizingPlayer
+  me
+  pieces
+  (game_state : Game_state.t)
+  : float
+  =
+  let game_kind = game_state.game_kind in
   let new_pieces = Map.set pieces ~key:pos ~data:me in
   if depth = 0
      ||
      match evaluate ~game_kind ~pieces:new_pieces with
      | Game_continues -> false
      | _ -> true
-  then score ~me ~game_kind ~pieces:new_pieces
+  then
+    (* print_endline "Score Check"; print_s [%message "" (new_pieces :
+       Piece.t Position.Map.t)]; print_endline (Game_state.to_string_hum
+       game_state); *)
+    score ~me ~game_kind ~pieces:new_pieces
   else if maximizingPlayer
   then (
-    let avmoves = available_moves ~game_kind ~pieces in
+    let avmoves = available_moves ~game_kind ~pieces:new_pieces in
     List.fold avmoves ~init:Float.neg_infinity ~f:(fun accum new_pos ->
       match
         List.max_elt
-          [ accum; minimax new_pos (depth - 1) false me pieces game_kind ]
+          [ accum
+          ; minimax
+              new_pos
+              (depth - 1)
+              false
+              (Piece.flip me)
+              new_pieces
+              game_state
+          ]
           ~compare:Float.compare
       with
       | Some pos -> pos
       | None -> accum))
   else (
-    let avmoves = available_moves ~game_kind ~pieces in
+    let avmoves = available_moves ~game_kind ~pieces:new_pieces in
     List.fold avmoves ~init:Float.infinity ~f:(fun accum new_pos ->
       match
         List.min_elt
-          [ accum; minimax new_pos (depth - 1) true me pieces game_kind ]
+          [ accum
+          ; minimax
+              new_pos
+              (depth - 1)
+              true
+              (Piece.flip me)
+              new_pieces
+              game_state
+          ]
           ~compare:Float.compare
       with
       | Some pos -> pos
       | None -> accum))
 ;;
+
+(* let _super_minimax ~(me : Piece.t) ~(game_kind : Game_kind.t) ~(pieces :
+   Piece.t Position.Map.t) : Position.t = let win_moves = winning_moves ~me
+   ~game_kind ~pieces in if List.is_empty win_moves then ( let lose_moves =
+   losing_moves ~me ~game_kind ~pieces in if List.is_empty lose_moves then (
+   let avmoves = available_moves ~game_kind ~pieces in match avmoves |>
+   List.map ~f:(fun pos -> minimax pos 5 true game_state, pos) |>
+   List.max_elt ~compare:(fun (v1, _) (v2, _) -> Float.compare v1 v2) with |
+   Some (_, pos) -> pos | None -> random_move_strategy ~game_kind ~pieces)
+   else List.random_element_exn lose_moves) else List.random_element_exn
+   win_moves ;; *)
 
 (* [compute_next_move] is your Game AI's function.
 
@@ -128,19 +170,15 @@ let compute_next_move ~(me : Piece.t) ~(game_state : Game_state.t)
   =
   let pieces = game_state.pieces in
   let game_kind = game_state.game_kind in
-  let avmoves =
-    available_moves ~game_kind:game_state.game_kind ~pieces:game_state.pieces
-  in
+  let avmoves = available_moves ~game_kind ~pieces in
   match
-    List.max_elt avmoves ~compare:(fun pos1 pos2 ->
-      Float.compare
-        (minimax pos1 4 true me pieces game_kind)
-        (minimax pos2 4 true me pieces game_kind))
+    avmoves
+    |> List.map ~f:(fun pos -> minimax pos 9 false me pieces game_state, pos)
+    |> List.max_elt ~compare:(fun (v1, _) (v2, _) -> Float.compare v1 v2)
   with
-  | Some pos -> pos
-  | None ->
-    pick_winning_move_or_block_if_possible_strategy
-      ~me
-      ~game_kind:game_state.game_kind
-      ~pieces:game_state.pieces
+  | Some (v1, pos) ->
+    print_endline (Game_state.to_string_hum game_state);
+    print_s [%message "" (v1 : Float.t)];
+    pos
+  | None -> random_move_strategy ~game_kind ~pieces
 ;;
