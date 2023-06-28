@@ -138,6 +138,8 @@ module Position = struct
   let left { row; column } = { row; column = column - 1 }
   let down_right t = t |> down |> right
   let up_right t = t |> up |> right
+  let up_left t = t |> up |> left
+  let down_left t = t |> down |> left
 
   let all_offsets =
     let ( >> ) = Fn.compose in

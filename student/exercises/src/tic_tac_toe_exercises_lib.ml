@@ -135,7 +135,7 @@ let evaluate ~(game_kind : Game_kind.t) ~(pieces : Piece.t Position.Map.t)
 ;;
 
 (* Exercise 3. *)
-let rec w_check_line
+let rec w_check_opp_line
   (to_win : int)
   (dir : Position.t -> Position.t)
   (old_pos : Position.t)
@@ -151,24 +151,58 @@ let rec w_check_line
     match Map.find pieces pos with
     | Some new_piece ->
       if Piece.equal new_piece piece
-      then w_check_line (to_win - 1) dir pos piece pieces game_kind
+      then w_check_opp_line (to_win - 1) dir pos piece pieces game_kind
       else false
     | None -> false)
 ;;
 
+let rec w_check_line
+  (to_win : int)
+  (dir : Position.t -> Position.t)
+  (opp_dir : Position.t -> Position.t)
+  (old_pos : Position.t)
+  (og_pos : Position.t)
+  (piece : Piece.t)
+  (pieces : Piece.t Position.Map.t)
+  (game_kind : Game_kind.t)
+  : bool
+  =
+  let pos = dir old_pos in
+  if to_win = 0
+  then true
+  else (
+    match Map.find pieces pos with
+    | Some new_piece ->
+      if Piece.equal new_piece piece
+      then
+        w_check_line
+          (to_win - 1)
+          dir
+          opp_dir
+          pos
+          og_pos
+          piece
+          pieces
+          game_kind
+      else w_check_opp_line to_win opp_dir og_pos piece pieces game_kind
+    | None -> w_check_opp_line to_win opp_dir og_pos piece pieces game_kind)
+;;
+
 let w_check_cell
-  (position : Position.t)
+  (pos : Position.t)
   (piece : Piece.t)
   (pieces : Piece.t Position.Map.t)
   (game_kind : Game_kind.t)
   : bool
   =
   let to_win = Game_kind.win_length game_kind - 1 in
-  let w_check_line_wrapper dir : bool =
-    w_check_line to_win dir position piece pieces game_kind
+  let w_check_line_wrapper dir opp_dir : bool =
+    w_check_line to_win dir opp_dir pos pos piece pieces game_kind
   in
-  let checks = Position.all_offsets in
-  List.exists checks ~f:w_check_line_wrapper
+  w_check_line_wrapper Position.right Position.left
+  || w_check_line_wrapper Position.down Position.up
+  || w_check_line_wrapper Position.down_right Position.up_left
+  || w_check_line_wrapper Position.up_right Position.down_left
 ;;
 
 let winning_moves
@@ -338,7 +372,7 @@ let%expect_test "winning_move" =
       ~me:Piece.X
   in
   print_s [%sexp (positions : Position.t list)];
-  [%expect {| ((((row 1) (column 1))))
+  [%expect {| (((row 1) (column 1)))
   |}];
   let positions =
     winning_moves
