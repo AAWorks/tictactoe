@@ -83,6 +83,37 @@ let score
 
 let _ = score
 
+let rec minimax pos depth maximizingPlayer me pieces game_kind : float =
+  let new_pieces = Map.set pieces ~key:pos ~data:me in
+  if depth = 0
+     ||
+     match evaluate ~game_kind ~pieces:new_pieces with
+     | Game_continues -> false
+     | _ -> true
+  then score ~me ~game_kind ~pieces:new_pieces
+  else if maximizingPlayer
+  then (
+    let avmoves = available_moves ~game_kind ~pieces in
+    List.fold avmoves ~init:Float.neg_infinity ~f:(fun accum new_pos ->
+      match
+        List.max_elt
+          [ accum; minimax new_pos (depth - 1) false me pieces game_kind ]
+          ~compare:Float.compare
+      with
+      | Some pos -> pos
+      | None -> accum))
+  else (
+    let avmoves = available_moves ~game_kind ~pieces in
+    List.fold avmoves ~init:Float.infinity ~f:(fun accum new_pos ->
+      match
+        List.min_elt
+          [ accum; minimax new_pos (depth - 1) true me pieces game_kind ]
+          ~compare:Float.compare
+      with
+      | Some pos -> pos
+      | None -> accum))
+;;
+
 (* [compute_next_move] is your Game AI's function.
 
    [game_ai.exe] will connect, communicate, and play with the game server,
@@ -97,5 +128,19 @@ let compute_next_move ~(me : Piece.t) ~(game_state : Game_state.t)
   =
   let pieces = game_state.pieces in
   let game_kind = game_state.game_kind in
-  pick_winning_move_or_block_if_possible_strategy ~me ~game_kind ~pieces
+  let avmoves =
+    available_moves ~game_kind:game_state.game_kind ~pieces:game_state.pieces
+  in
+  match
+    List.max_elt avmoves ~compare:(fun pos1 pos2 ->
+      Float.compare
+        (minimax pos1 4 true me pieces game_kind)
+        (minimax pos2 4 true me pieces game_kind))
+  with
+  | Some pos -> pos
+  | None ->
+    pick_winning_move_or_block_if_possible_strategy
+      ~me
+      ~game_kind:game_state.game_kind
+      ~pieces:game_state.pieces
 ;;

@@ -131,7 +131,10 @@ let evaluate ~(game_kind : Game_kind.t) ~(pieces : Piece.t Position.Map.t)
   in
   match List.find (boardlist game_kind) ~f:check_cell_wrapper with
   | Some pos -> Game_over { winner = Some (Map.find_exn pieces pos) }
-  | None -> Game_continues
+  | None ->
+    if List.is_empty (available_moves ~game_kind ~pieces)
+    then Game_over { winner = None }
+    else Game_continues
 ;;
 
 (* Exercise 3. *)
@@ -400,7 +403,6 @@ let%expect_test "print_losing" =
       ~me:Piece.O
   in
   print_s [%sexp (positions : Position.t list)];
-  [%expect
-    {|
+  [%expect {|
   (((row 1) (column 1))) |}]
 ;;
