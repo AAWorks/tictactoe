@@ -62,19 +62,23 @@ let pick_winning_move_or_block_if_possible_strategy
   else List.random_element_exn win_moves
 ;;
 
-(* disables unused warning. Feel free to delete once it's used. *)
-let _ = pick_winning_move_or_block_if_possible_strategy
-
 let score
   ~(me : Piece.t)
   ~(game_kind : Game_kind.t)
   ~(pieces : Piece.t Position.Map.t)
   : float
   =
-  ignore me;
-  ignore game_kind;
-  ignore pieces;
-  0.0
+  let check_cell_wrapper pos : bool =
+    match Map.find pieces pos with
+    | Some piece -> check_cell pos piece pieces game_kind
+    | None -> false
+  in
+  match List.find (boardlist game_kind) ~f:check_cell_wrapper with
+  | Some pos ->
+    if Piece.equal me (Map.find_exn pieces pos)
+    then Float.infinity
+    else Float.neg_infinity
+  | None -> 0.0
 ;;
 
 let _ = score

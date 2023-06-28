@@ -11,6 +11,15 @@ val available_moves
   -> pieces:Piece.t Position.Map.t
   -> Position.t list
 
+val boardlist : Game_kind.t -> Position.t list
+
+val check_cell
+  :  Position.t
+  -> Piece.t
+  -> Piece.t Position.Map.t
+  -> Game_kind.t
+  -> bool
+
 module Evaluation : sig
   (* Represents the evaluation of a tic tac toe / omok game. *)
   type t =
