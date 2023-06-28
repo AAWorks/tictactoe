@@ -173,7 +173,7 @@ let compute_next_move ~(me : Piece.t) ~(game_state : Game_state.t)
   let avmoves = available_moves ~game_kind ~pieces in
   match
     avmoves
-    |> List.map ~f:(fun pos -> minimax pos 9 false me pieces game_state, pos)
+    |> List.map ~f:(fun pos -> minimax pos 9 true me pieces game_state, pos)
     |> List.max_elt ~compare:(fun (v1, _) (v2, _) -> Float.compare v1 v2)
   with
   | Some (v1, pos) ->
