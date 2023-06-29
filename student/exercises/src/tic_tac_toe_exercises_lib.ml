@@ -129,9 +129,20 @@ let evaluate ~(game_kind : Game_kind.t) ~(pieces : Piece.t Position.Map.t)
     | Some piece -> check_cell pos piece pieces game_kind
     | None -> false
   in
-  match List.find (boardlist game_kind) ~f:check_cell_wrapper with
-  | Some pos -> Game_over { winner = Some (Map.find_exn pieces pos) }
-  | None ->
+  let newlist = List.filter (boardlist game_kind) ~f:check_cell_wrapper in
+  let x =
+    List.exists newlist ~f:(fun pos ->
+      Piece.equal (Map.find_exn pieces pos) Piece.X)
+  in
+  let o =
+    List.exists newlist ~f:(fun pos ->
+      Piece.equal (Map.find_exn pieces pos) Piece.O)
+  in
+  match x, o with
+  | true, true -> Illegal_state
+  | true, false -> Game_over { winner = Some Piece.X }
+  | false, true -> Game_over { winner = Some Piece.O }
+  | false, false ->
     if List.is_empty (available_moves ~game_kind ~pieces)
     then Game_over { winner = None }
     else Game_continues
@@ -405,4 +416,325 @@ let%expect_test "print_losing" =
   print_s [%sexp (positions : Position.t list)];
   [%expect {|
   (((row 1) (column 1))) |}]
+;;
+
+let empty_game_ttt =
+  let game_id = Game_id.of_int 0 in
+  let game_kind = Game_kind.Tic_tac_toe in
+  let player_x = Player.Player (Username.of_string "Player_X") in
+  let player_o = Player.Player (Username.of_string "Player_O") in
+  let game_status = Game_status.Turn_of Piece.X in
+  { Game_state.game_id
+  ; game_kind
+  ; player_x
+  ; player_o
+  ; pieces = Position.Map.empty
+  ; game_status
+  }
+;;
+
+let empty_game_omok =
+  let game_id = Game_id.of_int 0 in
+  let game_kind = Game_kind.Omok in
+  let player_x = Player.Player (Username.of_string "Player_X") in
+  let player_o = Player.Player (Username.of_string "Player_O") in
+  let game_status = Game_status.Turn_of Piece.X in
+  { Game_state.game_id
+  ; game_kind
+  ; player_x
+  ; player_o
+  ; pieces = Position.Map.empty
+  ; game_status
+  }
+;;
+
+let win_for_x_ttt =
+  empty_game_ttt
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 0 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 0 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 1 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 0; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 1; column = 2 }
+;;
+
+let non_win_ttt =
+  empty_game_ttt
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 0 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 0 }
+;;
+
+let win_for_o_ttt =
+  empty_game_ttt
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 0 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 1; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 0; column = 1 }
+;;
+
+let diag_win_for_o_ttt =
+  empty_game_ttt
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 0 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 0 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 1 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 1 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 0; column = 2 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 1; column = 2 }
+;;
+
+let invalid_state_ttt =
+  empty_game_ttt
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 0 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 1; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 0; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 1; column = 2 }
+;;
+
+let tie_ttt =
+  empty_game_ttt
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 0 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 1; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 1 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 0; column = 2 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 1 }
+;;
+
+let win_for_x_omok =
+  empty_game_omok
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 1 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 0; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 3 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 5 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 4 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 6 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 5 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 3; column = 7 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 3; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 3; column = 4 }
+;;
+
+let non_win_omok =
+  empty_game_omok
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 0; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 3; column = 8 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 4; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 13; column = 9 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 13; column = 8 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 13; column = 5 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 3; column = 5 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 5; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 4; column = 12 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 10; column = 8 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 3; column = 3 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 9; column = 9 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 5; column = 8 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 3; column = 5 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 6; column = 7 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 4; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 8; column = 12 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 18; column = 13 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 13; column = 14 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 15; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 7; column = 1 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 11; column = 7 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 12; column = 3 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 8; column = 14 }
+;;
+
+let minor_diag_win_for_x_omok =
+  empty_game_omok
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 1; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 5; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 14; column = 0 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 8 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 13; column = 1 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 12; column = 5 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 12; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 5; column = 6 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 11; column = 3 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 5; column = 8 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 10; column = 4 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 4; column = 8 }
+;;
+
+let win_for_o_omok =
+  empty_game_omok
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 1 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 0; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 3 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 5 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 4 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 6 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 4; column = 5 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 3; column = 7 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 3; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 4; column = 8 }
+;;
+
+let invalid_omok =
+  empty_game_omok
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 1 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 0; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 2 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 4 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 3 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 1; column = 5 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 4 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 2; column = 6 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 4; column = 5 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 3; column = 7 }
+  |> place_piece ~piece:Piece.X ~position:{ Position.row = 2; column = 5 }
+  |> place_piece ~piece:Piece.O ~position:{ Position.row = 4; column = 8 }
+;;
+
+let%expect_test "evaluate_win_for_x_ttt" =
+  print_endline
+    (evaluate ~game_kind:win_for_x_ttt.game_kind ~pieces:win_for_x_ttt.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Game_over(winner(X))) |}]
+;;
+
+let%expect_test "evaluate_non_win_ttt" =
+  print_endline
+    (evaluate ~game_kind:non_win_ttt.game_kind ~pieces:non_win_ttt.pieces
+     |> Evaluation.to_string);
+  [%expect {| Game_continues |}]
+;;
+
+let%expect_test "evaluate_win_for_o_ttt" =
+  print_endline
+    (evaluate ~game_kind:win_for_o_ttt.game_kind ~pieces:win_for_o_ttt.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Game_over(winner(O))) |}]
+;;
+
+let%expect_test "evaluate_tie_ttt" =
+  print_endline
+    (evaluate ~game_kind:tie_ttt.game_kind ~pieces:tie_ttt.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Game_over(winner())) |}]
+;;
+
+let%expect_test "evaluate_diag_win_o_ttt" =
+  print_endline
+    (evaluate
+       ~game_kind:diag_win_for_o_ttt.game_kind
+       ~pieces:diag_win_for_o_ttt.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Game_over(winner(O))) |}]
+;;
+
+let%expect_test "evaluate_invalid_game_ttt" =
+  print_endline
+    (evaluate
+       ~game_kind:invalid_state_ttt.game_kind
+       ~pieces:invalid_state_ttt.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Game_over(winner())) |}]
+;;
+
+let%expect_test "evaluate_win_for_x_omok" =
+  print_endline
+    (evaluate
+       ~game_kind:win_for_x_omok.game_kind
+       ~pieces:win_for_x_omok.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Game_over(winner(X))) |}]
+;;
+
+let%expect_test "evaluate_non_win_omok" =
+  print_endline
+    (evaluate ~game_kind:non_win_omok.game_kind ~pieces:non_win_omok.pieces
+     |> Evaluation.to_string);
+  [%expect {| Game_continues |}]
+;;
+
+let%expect_test "evaluate_minor_diag_win_for_x_omok" =
+  print_endline
+    (evaluate
+       ~game_kind:minor_diag_win_for_x_omok.game_kind
+       ~pieces:minor_diag_win_for_x_omok.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Game_over(winner(X))) |}]
+;;
+
+let%expect_test "evaluate_win_for_o_omok" =
+  print_endline
+    (evaluate
+       ~game_kind:win_for_o_omok.game_kind
+       ~pieces:win_for_o_omok.pieces
+     |> Evaluation.to_string);
+  [%expect {| (Game_over(winner(O))) |}]
+;;
+
+let%expect_test "evaluate_invalid_omok" =
+  print_endline
+    (evaluate ~game_kind:invalid_omok.game_kind ~pieces:invalid_omok.pieces
+     |> Evaluation.to_string);
+  [%expect {| Illegal_state |}]
+;;
+
+let%expect_test "winning_move_ttt" =
+  let positions =
+    winning_moves
+      ~game_kind:non_win_ttt.game_kind
+      ~pieces:non_win_ttt.pieces
+      ~me:Piece.X
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect {| (((row 1) (column 1)))
+  |}];
+  let positions =
+    winning_moves
+      ~game_kind:non_win_ttt.game_kind
+      ~pieces:non_win_ttt.pieces
+      ~me:Piece.O
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect {| () |}]
+;;
+
+let%expect_test "winning_move_omok" =
+  let positions =
+    winning_moves
+      ~game_kind:non_win_omok.game_kind
+      ~pieces:non_win_omok.pieces
+      ~me:Piece.X
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect {| ()
+  |}];
+  let positions =
+    winning_moves
+      ~game_kind:non_win_omok.game_kind
+      ~pieces:non_win_omok.pieces
+      ~me:Piece.O
+  in
+  print_s [%sexp (positions : Position.t list)];
+  [%expect {| (((row 12) (column 6))) |}]
 ;;
