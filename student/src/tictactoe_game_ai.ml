@@ -64,17 +64,102 @@ let pick_winning_move_or_block_if_possible_strategy
 
 let _ = pick_winning_move_or_block_if_possible_strategy
 
+let rec _s_check_opp_line
+  (to_win : int)
+  (dir : Position.t -> Position.t)
+  (old_pos : Position.t)
+  (piece : Piece.t)
+  (pieces : Piece.t Position.Map.t)
+  (game_kind : Game_kind.t)
+  (score : float)
+  : float
+  =
+  let pos = dir old_pos in
+  if to_win = 0
+  then score
+  else (
+    match Map.find pieces pos with
+    | Some new_piece ->
+      if Piece.equal new_piece piece
+      then
+        _s_check_opp_line
+          (to_win - 1)
+          dir
+          pos
+          piece
+          pieces
+          game_kind
+          (score +. 1.0)
+      else score
+    | None -> score)
+;;
+
+let rec _s_check_line
+  (to_win : int)
+  (dir : Position.t -> Position.t)
+  (opp_dir : Position.t -> Position.t)
+  (old_pos : Position.t)
+  (og_pos : Position.t)
+  (piece : Piece.t)
+  (pieces : Piece.t Position.Map.t)
+  (game_kind : Game_kind.t)
+  (score : float)
+  : float
+  =
+  let pos = dir old_pos in
+  if to_win = 0
+  then score
+  else (
+    match Map.find pieces pos with
+    | Some new_piece ->
+      if Piece.equal new_piece piece
+      then
+        _s_check_line
+          (to_win - 1)
+          dir
+          opp_dir
+          pos
+          og_pos
+          piece
+          pieces
+          game_kind
+          (score +. 1.0)
+      else
+        _s_check_opp_line to_win opp_dir og_pos piece pieces game_kind score
+    | None ->
+      _s_check_opp_line to_win opp_dir og_pos piece pieces game_kind score)
+;;
+
+let _s_check_cell
+  (pos : Position.t)
+  (piece : Piece.t)
+  (pieces : Piece.t Position.Map.t)
+  (game_kind : Game_kind.t)
+  : float
+  =
+  let to_win = Game_kind.win_length game_kind - 1 in
+  let s_check_line_wrapper dir opp_dir : float =
+    _s_check_line to_win dir opp_dir pos pos piece pieces game_kind 0.0
+  in
+  match
+    List.max_elt
+      [ s_check_line_wrapper Position.right Position.left
+      ; s_check_line_wrapper Position.down Position.up
+      ; s_check_line_wrapper Position.down_right Position.up_left
+      ; s_check_line_wrapper Position.up_right Position.down_left
+      ]
+      ~compare:(fun v1 v2 -> Float.compare v1 v2)
+  with
+  | Some score -> score
+  | None -> failwith "wtf"
+;;
+
 let score
   ~(me : Piece.t)
   ~(game_kind : Game_kind.t)
   ~(pieces : Piece.t Position.Map.t)
   : float
   =
-  (* let check_cell_wrapper pos : bool = match Map.find pieces pos with |
-     Some piece -> check_cell pos piece pieces game_kind | None -> false in
-     match List.find (boardlist game_kind) ~f:check_cell_wrapper with | Some
-     pos -> if Piece.equal me (Map.find_exn pieces pos) then Float.infinity
-     else Float.neg_infinity | None -> 0.0 *)
   match evaluate ~game_kind ~pieces with
   | Game_over { winner = Some piece } ->
     if Piece.equal piece me then Float.infinity else Float.neg_infinity
@@ -117,40 +202,51 @@ let rec minimax
   pieces
   (game_state : Game_state.t)
   player
+  avmoves
   : float
   =
   let game_kind = game_state.game_kind in
   let new_pieces = Map.set pieces ~key:pos ~data:me in
-  if depth = 0
-     ||
-     match evaluate ~game_kind ~pieces:new_pieces with
-     | Game_continues -> false
-     | _ -> true
+  let s = score ~me:player ~game_kind ~pieces:new_pieces in
+  if depth = 0 || match s with 0.0 -> false | _ -> true
   then
+    s
     (* print_endline "Score Check"; print_s [%message "" (new_pieces :
        Piece.t Position.Map.t)]; print_endline (Game_state.to_string_hum
        game_state); *)
-    score ~me:player ~game_kind ~pieces:new_pieces
   else if maximizingPlayer
   then (
-    let avmoves = available_moves ~game_kind ~pieces:new_pieces in
-    avmoves
-    |> List.map ~f:(fun new_pos ->
-         minimax
-           new_pos
-           (depth - 1)
-           false
-           (Piece.flip me)
-           new_pieces
-           game_state
-           player)
-    |> List.fold ~init:Float.neg_infinity ~f:Float.max)
+    let new_avmoves = Set.remove avmoves pos in
+    new_avmoves
+    |> Set.map
+         (module Float)
+         ~f:(fun new_pos ->
+           minimax
+             new_pos
+             (depth - 1)
+             false
+             (Piece.flip me)
+             new_pieces
+             game_state
+             player
+             new_avmoves)
+    |> Set.fold ~init:Float.neg_infinity ~f:Float.max)
   else (
-    let avmoves = available_moves ~game_kind ~pieces:new_pieces in
-    avmoves
-    |> List.map ~f:(fun new_pos ->
-         minimax new_pos (depth - 1) true me new_pieces game_state player)
-    |> List.fold ~init:Float.infinity ~f:Float.min)
+    let new_avmoves = Set.remove avmoves pos in
+    new_avmoves
+    |> Set.map
+         (module Float)
+         ~f:(fun new_pos ->
+           minimax
+             new_pos
+             (depth - 1)
+             true
+             me
+             new_pieces
+             game_state
+             player
+             new_avmoves)
+    |> Set.fold ~init:Float.infinity ~f:Float.min)
 ;;
 
 (* let _super_minimax ~(me : Piece.t) ~(game_kind : Game_kind.t) ~(pieces :
@@ -173,6 +269,7 @@ let rec minimax
    [compute_next_move] is only called whenever it is your turn, the game
    isn't yet over, so feel free to raise in cases where there are no
    available spots to pick. *)
+
 let compute_next_move ~(me : Piece.t) ~(game_state : Game_state.t)
   : Position.t
   =
@@ -182,13 +279,17 @@ let compute_next_move ~(me : Piece.t) ~(game_state : Game_state.t)
   match
     avmoves
     |> List.map ~f:(fun pos ->
-         minimax pos 11 true me pieces game_state me, pos)
-    |> List.max_elt ~compare:(fun (v1, _pos1) (v2, _pos2) ->
-         print_s [%message "" (v1 : Float.t)];
-         print_s [%message "" (_pos1 : Position.t)];
-         print_s [%message "" (v2 : Float.t)];
-         print_s [%message "" (_pos2 : Position.t)];
-         Float.compare v1 v2)
+         ( minimax
+             pos
+             11
+             true
+             me
+             pieces
+             game_state
+             me
+             (Position.Set.of_list avmoves)
+         , pos ))
+    |> List.max_elt ~compare:(fun (_v1, _) (_v2, _) -> Float.compare _v1 _v2)
   with
   | Some (_v1, pos) ->
     print_endline (Game_state.to_string_hum game_state);
